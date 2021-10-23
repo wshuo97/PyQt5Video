@@ -129,5 +129,13 @@ dmypy.json
 .pyre/
 
 # other files
+data/
+test/
 *.avi
 *.mp4
+**/*.jpg
+**/*.txt
+**/*.t7
+**/*.pt
+**/*.yaml
+**/checkpoint/
