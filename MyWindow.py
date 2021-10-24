@@ -55,6 +55,8 @@ class MyWindow(QMainWindow):
         self.hasTracker = False
         self.hasDetector = False
         self.couldShowImg = False
+        self.detectResults = []
+        self.trackResults = []
 
     def getVideo(self):
         directory = QFileDialog.getOpenFileNames(
@@ -133,13 +135,14 @@ class MyWindow(QMainWindow):
                 resFrame = frame
                 if self.isDetecting and not self.isTracking:
                     (bbox_xywh, cls_ids, cls_conf, detRes) = self.detecting(frame)
-                    resFrame = self.drawBboxes(detRes, frame, "detect")
+                    resFrame = self.drawBboxes(
+                        detRes, frame, self.frameid, "detect")
                 elif self.isTracking:
                     (bbox_xywh, cls_ids, cls_conf, _) = self.detecting(frame)
                     trackRes = self.tracking(
                         bbox_xywh, cls_ids, cls_conf, frame)
                     # print(trackRes)
-                    resFrame = self.drawBboxes(trackRes, frame)
+                    resFrame = self.drawBboxes(trackRes, frame, self.frameid)
                 self.images[self.frameid % 10] = resFrame
                 # self.couldShowImg = True
                 self.sendImg.emit(self.frameid % 10)
@@ -152,7 +155,7 @@ class MyWindow(QMainWindow):
         cap.release()
         cv2.destroyAllWindows()
 
-    def drawBboxes(self, trackRes, im0s, flag="track"):
+    def drawBboxes(self, trackRes, im0s, frameid, flag="track"):
         opt = self.DaT.opt
         im0 = im0s.copy()
         # print(trackRes)
@@ -164,12 +167,28 @@ class MyWindow(QMainWindow):
                         labelid = cnames[int(idx)]
                     else:
                         labelid = f'{idx}'
+                    self.trackResults.append((frameid - 1, cnames[_],
+                                              xyxy, idx))
                     plot_one_box(xyxy,
                                  im0,
                                  label=labelid,
                                  color=colors(idx % 255, True),
                                  line_thickness=opt.line_thickness)
         return im0
+
+    def write_results(self, filename, results):
+        save_format = "{frame},{cname},{id},{x1},{y1},{x2},{y2}\n"
+        with open(filename, 'w') as f:
+            for frame_id, cls_name, xyxy, track_id in results:
+                x1, y1, x2, y2 = xyxy
+                line = save_format.format(frame=frame_id,
+                                          id=track_id,
+                                          x1=x1,
+                                          y1=y1,
+                                          x2=x2,
+                                          y2=y2,
+                                          cname=cls_name)
+                f.write(line)
 
     def detecting(self, frame):
         return self.DaT.detect(frame)
@@ -179,9 +198,11 @@ class MyWindow(QMainWindow):
 
     def closeEvent(self, event):
         reply = QtWidgets.QMessageBox.question(
-            self, "Wraning!", "Really to quit?", QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
+            self, "警告!", "确定关闭软件?", QtWidgets.QMessageBox.Yes, QtWidgets.QMessageBox.No)
         if reply == QtWidgets.QMessageBox.Yes:
             self.exit = True
+            if len(self.trackResults) != 0:
+                self.write_results("./log/results.txt", self.trackResults)
             event.accept()
         else:
             event.ignore()
