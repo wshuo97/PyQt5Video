@@ -145,7 +145,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>00:00/00:00</string>
+     <string>00000/00000</string>
     </property>
    </widget>
   </widget>
@@ -162,9 +162,21 @@
     <property name="title">
      <string>Files</string>
     </property>
+    <addaction name="videoSave"/>
+    <addaction name="textSave"/>
    </widget>
    <addaction name="menuFiles"/>
   </widget>
+  <action name="videoSave">
+   <property name="text">
+    <string>跟踪视频保存</string>
+   </property>
+  </action>
+  <action name="textSave">
+   <property name="text">
+    <string>跟踪文件保存</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
