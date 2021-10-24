@@ -8,7 +8,7 @@ from utils.general import non_max_suppression, scale_coords
 
 
 class DaT:
-    def __init__(self, detWeights, pTrackPath="./weights/ckpt.net64do.t7",
+    def __init__(self, detWeights="./weights/yolov5s.pt", pTrackPath="./weights/ckpt.net64do.t7",
                  vTrackPath="./weights/ckpt.net128do.t7", pnum=64, vnum=164):
         self.opt = self.getOpt()
         opt = self.opt
@@ -20,7 +20,11 @@ class DaT:
         self.vnum = vnum
         self.img_size = opt.img_size
 
-    def newDetector(self):
+    def setDetector(self, detWeights):
+        self.weights = detWeights
+
+    def newDetector(self, detWeights="./weights/yolov5s.pt"):
+        self.weights = detWeights
         self.model = attempt_load(
             self.weights, map_location=self.device)  # load FP32 model
         self.stride = int(self.model.stride.max())  # model stride
@@ -72,8 +76,28 @@ class DaT:
                 bbox_xywh = np.asarray(ret.cpu())
                 cls_ids = np.asarray(clsl.cpu())
                 cls_conf = np.asarray(clsc.cpu())
-
-        return (bbox_xywh, cls_ids, cls_conf)
+        mask = (cls_ids == 0) + (cls_ids == 1) + (cls_ids == 2) + (cls_ids == 3) + \
+            (cls_ids == 4) + (cls_ids == 5) + \
+            (cls_ids == 6) + (cls_ids == 7)
+        vmask = (cls_ids == 1) + (cls_ids == 2) + (cls_ids == 3) + \
+            (cls_ids == 4) + (cls_ids == 5) + \
+            (cls_ids == 6) + (cls_ids == 7)
+        bbox_xywh = bbox_xywh[mask]
+        cls_conf = cls_conf[mask]
+        cls_ids[vmask] = 1
+        cls_ids = cls_ids[mask]
+        bbox_xyxy = bbox_xywh.copy()
+        bbox_xyxy[:, 0] = bbox_xywh[:, 0]-bbox_xywh[:, 2]/2
+        bbox_xyxy[:, 1] = bbox_xywh[:, 1]-bbox_xywh[:, 3]/2
+        bbox_xyxy[:, 2] = bbox_xywh[:, 0]+bbox_xywh[:, 2]/2
+        bbox_xyxy[:, 3] = bbox_xywh[:, 1]+bbox_xywh[:, 3]/2
+        detRes = []
+        for i in range(len(cls_ids)):
+            detRes.append((bbox_xyxy[i][0], bbox_xyxy[i][1],
+                          bbox_xyxy[i][2], bbox_xyxy[i][3], cls_ids[i]))
+        # detRes = [detRes]
+        # print(detRes)
+        return (bbox_xywh, cls_ids, cls_conf, [detRes])
 
     def track(self, bbox_xywh, cls_ids, cls_conf, im0s):
         poutputs = []
@@ -84,9 +108,6 @@ class DaT:
             pbbox_xywh = bbox_xywh[pmask]
             pcls_conf = cls_conf[pmask]
             pcls_ids = cls_ids[pmask]
-
-            # print(pbbox_xywh)
-
             poutputs = self.ptracker.update(bbox_xywh=pbbox_xywh,
                                             classid=pcls_ids,
                                             confidences=pcls_conf,

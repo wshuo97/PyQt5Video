@@ -7,8 +7,10 @@ from PyQt5.QtWidgets import QFileDialog, QMainWindow
 from PyQt5.uic import loadUi
 from DaT import DaT
 
+import os
 import cv2
 import numpy as np
+# import _thread
 from utils.plots import colors, plot_one_box
 
 
@@ -24,18 +26,23 @@ class MyWindow(QMainWindow):
         # window settings
         self.showBlock.setFixedSize(
             self.showBlock.width(), self.showBlock.height())
+        # self.selectDet.addItems(['YOLOv5s', 'YOLOv5l', 'YOLOv5x'])
 
         # signal and slot
         self.selectVideo.clicked.connect(self.getVideo)
         self.selectDet.clicked.connect(self.getDet)
         self.vidControl.clicked.connect(self.setPlayState)
         self.startTracking.clicked.connect(self.setTrackState)
+        self.startDetecting.clicked.connect(self.setDetectState)
 
         self.sendImg.connect(self.showImg)
         self.loadVid.connect(self.vidPlay)
 
+        # class
+        # _thread.start_new_thread(self.showImgThread, (self,))
+
         # others
-        # self.DaT = DaT(self.detPath)
+        self.DaT = DaT()
         self.images = [1 for _ in range(10)]
         self.inputImg = [1 for _ in range(10)]
         self.srcImages = []
@@ -43,41 +50,36 @@ class MyWindow(QMainWindow):
         self.exit = False
         self.stFrameIndex = 0
         self.frameid = 0
+        self.isDetecting = False
         self.isTracking = False
-        self.hasDetector = False
         self.hasTracker = False
-        # self.img_size = self.DaT.imgsz
-        # self.stride = self.DaT.stride
+        self.hasDetector = False
+        self.couldShowImg = False
 
     def getVideo(self):
         directory = QFileDialog.getOpenFileNames(
             self, "Select File", "./", "All Files (*);;Text Files (*.txt)")[0]
+        if len(directory) == 0:
+            return
         self.vidPath = directory[0]
-
         cap = cv2.VideoCapture(self.vidPath)
         # frameid = 0
         self.videoLength = int(cap.get(7))
         self.videoFps = int(cap.get(5))
         self.blockTime = int(1./self.videoFps*1000)
         self.size = (self.showBlock.width(), self.showBlock.height())
-
         cap.release()
         cv2.destroyAllWindows()
-
         self.videoPath.setText(self.vidPath)
-
-        # self.loadVid.emit()
 
     def getDet(self):
         directory = QFileDialog.getOpenFileNames(
             self, "Select File", "./", "All Files (*);;Text Files (*.txt)")[0]
+        if len(directory) == 0:
+            return
         self.detWeights = directory[0]
-        self.detectorPath.setText(self.vidPath)
-
-        if not self.hasDetector:
-            self.hasDetector = True
-            self.DaT = DaT(self.detWeights)
-            self.DaT.newDetector()
+        self.DaT.newDetector(self.detWeights)
+        self.detectorPath.setText(self.detWeights)
 
     def setPlayState(self):
         self.ablePlay = not self.ablePlay
@@ -87,7 +89,16 @@ class MyWindow(QMainWindow):
         else:
             self.vidControl.setText("播放")
 
+    def setDetectState(self):
+        self.isDetecting = not self.isDetecting
+        if self.isDetecting:
+            self.startDetecting.setText("停止检测")
+        else:
+            self.startDetecting.setText("开始检测")
+
     def setTrackState(self):
+        # if not self.isDetecting and not self.isTracking:
+        #     QtWidgets.QMessageBox.question(self, "Wraning!", "No Detector!")
         if not self.hasTracker:
             self.hasTracker = True
             self.DaT.newTracker()
@@ -120,12 +131,17 @@ class MyWindow(QMainWindow):
                 break
             if ret == True:
                 resFrame = frame
-                if self.isTracking:
-                    (bbox_xywh, cls_ids, cls_conf) = self.detecting(frame)
+                if self.isDetecting and not self.isTracking:
+                    (bbox_xywh, cls_ids, cls_conf, detRes) = self.detecting(frame)
+                    resFrame = self.drawBboxes(detRes, frame, "detect")
+                elif self.isTracking:
+                    (bbox_xywh, cls_ids, cls_conf, _) = self.detecting(frame)
                     trackRes = self.tracking(
                         bbox_xywh, cls_ids, cls_conf, frame)
+                    # print(trackRes)
                     resFrame = self.drawBboxes(trackRes, frame)
                 self.images[self.frameid % 10] = resFrame
+                # self.couldShowImg = True
                 self.sendImg.emit(self.frameid % 10)
             else:
                 break
@@ -136,13 +152,18 @@ class MyWindow(QMainWindow):
         cap.release()
         cv2.destroyAllWindows()
 
-    def drawBboxes(self, trackRes, im0s):
+    def drawBboxes(self, trackRes, im0s, flag="track"):
         opt = self.DaT.opt
         im0 = im0s.copy()
+        # print(trackRes)
+        cnames = ["person", "vehicle"]
         for _, det in enumerate(trackRes):
             if len(det):
                 for *xyxy, idx in reversed(det):
-                    labelid = f'{idx}'
+                    if flag != "track":
+                        labelid = cnames[int(idx)]
+                    else:
+                        labelid = f'{idx}'
                     plot_one_box(xyxy,
                                  im0,
                                  label=labelid,
