@@ -1,13 +1,6 @@
-from PyQt5.QtWidgets import *
-from PyQt5.QtMultimedia import *
-import sys
 
-import warnings 
-warnings.filterwarnings("ignore")
 
-from MyWindow import MyWindow
-
-def main1():
+def main():
     app = QApplication(sys.argv)
     vw = MyWindow()
     vw.show()
@@ -16,4 +9,4 @@ def main1():
 
 
 if __name__ == '__main__':
-    main1()
+    main()
