@@ -80,6 +80,7 @@ class Track:
 
         self.pf = ParticleFilter(frame_shape=frame_shape)
         self.pf.create(bbox_tlwh, cur_img)
+        self.bbox_tlwh = bbox_tlwh
 
         self._n_init = n_init
         self._max_age = max_age
@@ -94,9 +95,13 @@ class Track:
             The bounding box.
 
         """
-        ret = self.mean[:4].copy()
-        ret[2] *= ret[3]
-        ret[:2] -= ret[2:] / 2
+        # use kf
+        # ret = self.mean[:4].copy()
+        # ret[2] *= ret[3]
+        # ret[:2] -= ret[2:] / 2
+
+        # use pf
+        ret = self.bbox_tlwh.copy()
         return ret
 
     def to_tlbr(self):
@@ -161,6 +166,7 @@ class Track:
 
     def pf_predict(self, cur_img):
         x, y, xx, yy = self.pf.predict()
+        self.bbox_tlwh = np.asarray((x, y, xx-x, yy-y))
         self.pf.update(cur_rect=(x, y, xx-x, yy-y), im=cur_img)
         self.pf.resample()
         # return rect (x, y, xx, yy)

@@ -102,6 +102,7 @@ class Net128do(nn.Module):
         # 10
 
     def forward(self, x):
+        # print(x.shape)
         x = self.conv(x)
         x = self.layer4(x)
         x = self.layer5(x)
@@ -110,6 +111,7 @@ class Net128do(nn.Module):
         x = self.layer8(x)
         x = self.layer9(x)
         x = x.view(x.size(0), -1)
+        # print(x.shape)
         x = self.dense(x)
         if self.reid:
             x = x.div(x.norm(p=2, dim=1, keepdim=True))

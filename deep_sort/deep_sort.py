@@ -16,8 +16,8 @@ class DeepSort(object):
         self.min_confidence = min_confidence
         self.nms_max_overlap = nms_max_overlap
 
-        # self.extractor = Extractor(
-        #     model_path, classnum, use_cuda=use_cuda, device=device)
+        self.extractor = Extractor(
+            model_path, classnum, use_cuda=use_cuda, device=device)
 
         # print(self.extractor)
 
